@@ -13,6 +13,7 @@ use Arch::*;
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, PartialEq)]
 pub(crate) enum Arch {
+    Armv6,
     Armv7k,
     Armv7s,
     Arm64,
@@ -27,6 +28,7 @@ pub(crate) enum Arch {
 impl Arch {
     fn target_name(self) -> &'static str {
         match self {
+            Armv6 => "armv6",
             Armv7k => "armv7k",
             Armv7s => "armv7s",
             Arm64 => "arm64",
@@ -41,7 +43,7 @@ impl Arch {
 
     pub(crate) fn target_arch(self) -> Cow<'static, str> {
         Cow::Borrowed(match self {
-            Armv7k | Armv7s => "arm",
+            Armv6 | Armv7k | Armv7s => "arm",
             Arm64 | Arm64e | Arm64_32 => "aarch64",
             I386 | I686 => "x86",
             X86_64 | X86_64h => "x86_64",
@@ -50,6 +52,7 @@ impl Arch {
 
     fn target_cpu(self, abi: TargetAbi) -> &'static str {
         match self {
+            Armv6 => "arm1176jzf-s",
             Armv7k => "cortex-a8",
             Armv7s => "swift", // iOS 10 is only supported on iPhone 5 or higher.
             Arm64 => match abi {
@@ -73,7 +76,7 @@ impl Arch {
 
     fn stack_probes(self) -> StackProbeType {
         match self {
-            Armv7k | Armv7s => StackProbeType::None,
+            Armv6 | Armv7k | Armv7s => StackProbeType::None,
             Arm64 | Arm64e | Arm64_32 | I386 | I686 | X86_64 | X86_64h => StackProbeType::Inline,
         }
     }

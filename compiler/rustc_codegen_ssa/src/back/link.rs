@@ -3012,6 +3012,7 @@ fn add_apple_link_args(cmd: &mut dyn Linker, sess: &Session, flavor: LinkerFlavo
     // Intentially verbose to ensure that the list always matches correctly
     // with the list in the source above.
     let ld64_arch = match llvm_arch {
+        "armv6" => "armv6",
         "armv7k" => "armv7k",
         "armv7s" => "armv7s",
         "arm64" => "arm64",

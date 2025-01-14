@@ -67,7 +67,7 @@ fn os_minimum_deployment_target(os: &str) -> OSVersion {
     // ```
     match os {
         "macos" => (10, 12, 0),
-        "ios" => (10, 0, 0),
+        "ios" => (3, 0, 0),
         "tvos" => (10, 0, 0),
         "watchos" => (5, 0, 0),
         "visionos" => (1, 0, 0),

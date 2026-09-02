@@ -14,6 +14,8 @@ mod tests;
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, PartialEq)]
 pub(crate) enum Arch {
+    Armv6,
+    Armv7,
     Armv7k,
     Armv7s,
     Arm64,
@@ -28,6 +30,8 @@ pub(crate) enum Arch {
 impl Arch {
     fn target_name(self) -> &'static str {
         match self {
+            Self::Armv6 => "armv6",
+            Self::Armv7 => "armv7",
             Self::Armv7k => "armv7k",
             Self::Armv7s => "armv7s",
             Self::Arm64 => "arm64",
@@ -42,7 +46,7 @@ impl Arch {
 
     pub(crate) fn target_arch(self) -> crate::spec::Arch {
         match self {
-            Self::Armv7k | Self::Armv7s => crate::spec::Arch::Arm,
+            Self::Armv6 | Self::Armv7 | Self::Armv7k | Self::Armv7s => crate::spec::Arch::Arm,
             Self::Arm64 | Self::Arm64e | Self::Arm64_32 => crate::spec::Arch::AArch64,
             Self::I386 | Self::I686 => crate::spec::Arch::X86,
             Self::X86_64 | Self::X86_64h => crate::spec::Arch::X86_64,
@@ -51,8 +55,10 @@ impl Arch {
 
     fn target_cpu(self, env: TargetEnv) -> &'static str {
         match self {
+            Self::Armv6 => "mpcore",
+            Self::Armv7 => "cortex-a8",
             Self::Armv7k => "cortex-a8",
-            Self::Armv7s => "swift", // iOS 10 is only supported on iPhone 5 or higher.
+            Self::Armv7s => "swift",
             Self::Arm64 => match env {
                 TargetEnv::Normal => "apple-a7",
                 TargetEnv::Simulator => "apple-a12",
@@ -60,21 +66,18 @@ impl Arch {
             },
             Self::Arm64e => "apple-a12",
             Self::Arm64_32 => "apple-s4",
-            // Only macOS 10.12+ is supported, which means
-            // all x86_64/x86 CPUs must be running at least penryn
-            // https://github.com/llvm/llvm-project/blob/01f924d0e37a5deae51df0d77e10a15b63aa0c0f/clang/lib/Driver/ToolChains/Arch/X86.cpp#L79-L82
-            Self::I386 | Self::I686 => "penryn",
-            Self::X86_64 => "penryn",
+            Self::I386 | Self::I686 => "pentium-m",
+            Self::X86_64 => "core2",
             // Note: `core-avx2` is slightly more advanced than `x86_64h`, see
             // comments (and disabled features) in `x86_64h_apple_darwin` for
-            // details. It is a higher baseline then `penryn` however.
+            // details. It is a higher baseline then `core2` however.
             Self::X86_64h => "core-avx2",
         }
     }
 
     fn stack_probes(self) -> StackProbeType {
         match self {
-            Self::Armv7k | Self::Armv7s => StackProbeType::None,
+            Self::Armv6 | Self::Armv7 | Self::Armv7k | Self::Armv7s => StackProbeType::None,
             Self::Arm64
             | Self::Arm64e
             | Self::Arm64_32
@@ -146,22 +149,15 @@ pub(crate) fn base(
         families: cvs!["unix"],
         is_like_darwin: true,
         binary_format: BinaryFormat::MachO,
-        // LLVM notes that macOS 10.11+ and iOS 9+ default
-        // to v4, so we do the same.
-        // https://github.com/llvm/llvm-project/blob/378778a0d10c2f8d5df8ceff81f95b6002984a4b/clang/lib/Driver/ToolChains/Darwin.cpp#L1203
-        default_dwarf_version: 4,
+        default_dwarf_version: 2,
         frame_pointer: match arch {
-            // clang ignores `-fomit-frame-pointer` for Armv7, it only accepts `-momit-leaf-frame-pointer`
-            Arch::Armv7k | Arch::Armv7s => FramePointer::Always,
-            // clang supports omitting frame pointers for the rest, but... don't?
-            Arch::Arm64 | Arch::Arm64e | Arch::Arm64_32 => FramePointer::NonLeaf,
+            Arch::Armv6 | Arch::Armv7 | Arch::Armv7k | Arch::Armv7s | Arch::Arm64 | Arch::Arm64e | Arch::Arm64_32 => FramePointer::NonLeaf,
             Arch::I386 | Arch::I686 | Arch::X86_64 | Arch::X86_64h => FramePointer::Always,
         },
         has_rpath: true,
         dll_suffix: ".dylib".into(),
         archive_format: "darwin".into(),
-        // Thread locals became available with iOS 8 and macOS 10.7,
-        // and both are far below our minimum.
+        // Thread locals became available with iOS 8 and macOS 10.7.
         has_thread_local: true,
         abi_return_struct_as_int: true,
         emit_debug_gdb_scripts: false,
@@ -308,10 +304,10 @@ impl OSVersion {
         // $ rustc --print deployment-target
         // ```
         let (major, minor, patch) = match os {
-            Os::MacOs => (10, 12, 0),
-            Os::IOs => (10, 0, 0),
-            Os::TvOs => (10, 0, 0),
-            Os::WatchOs => (5, 0, 0),
+            Os::MacOs => (10, 5, 0),
+            Os::IOs => (2, 0, 0),
+            Os::TvOs => (9, 0, 0),
+            Os::WatchOs => (2, 0, 0),
             Os::VisionOs => (1, 0, 0),
             other => {
                 unreachable!("tried to get deployment target for non-Apple platform: {:?}", other)
@@ -330,12 +326,17 @@ impl OSVersion {
     pub fn minimum_deployment_target(target: &Target) -> Self {
         let (major, minor, patch) = match (&target.os, &target.arch, &target.env) {
             (Os::MacOs, crate::spec::Arch::AArch64, _) => (11, 0, 0),
+            (Os::MacOs, crate::spec::Arch::X86_64, _) => (10, 6, 0),
             (Os::IOs, crate::spec::Arch::AArch64, Env::MacAbi) => (14, 0, 0),
             (Os::IOs, crate::spec::Arch::AArch64, Env::Sim) => (14, 0, 0),
             (Os::IOs, _, _) if target.llvm_target.starts_with("arm64e") => (14, 0, 0),
+            (Os::IOs, _, _) if target.llvm_target.starts_with("arm64") => (7, 0, 0),
+            (Os::IOs, _, _) if target.llvm_target.starts_with("armv7s") => (6, 0, 0),
+            (Os::IOs, _, _) if target.llvm_target.starts_with("armv7") => (3, 0, 0),
             // Mac Catalyst defaults to 13.1 in Clang.
             (Os::IOs, _, Env::MacAbi) => (13, 1, 0),
             (Os::TvOs, crate::spec::Arch::AArch64, Env::Sim) => (14, 0, 0),
+            (Os::TvOs, _, _) if target.llvm_target.starts_with("arm64e") => (14, 0, 0),
             (Os::WatchOs, crate::spec::Arch::AArch64, Env::Sim) => (7, 0, 0),
             // True Aarch64 on watchOS (instead of their Aarch64 Ilp32 called `arm64_32`) has been
             // available since Xcode 14, but it's only actually used more recently in watchOS 26.

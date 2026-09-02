@@ -1,5 +1,5 @@
 use crate::spec::base::apple::{Arch, TargetEnv, base};
-use crate::spec::{Os, SanitizerSet, Target, TargetMetadata, TargetOptions};
+use crate::spec::{Cc, LinkerFlavor, Lld, Os, SanitizerSet, Target, TargetMetadata, TargetOptions};
 
 pub(crate) fn target() -> Target {
     let (opts, llvm_target, arch) = base(Os::IOs, Arch::Arm64, TargetEnv::Normal);
@@ -21,6 +21,8 @@ pub(crate) fn target() -> Target {
             supported_sanitizers: SanitizerSet::ADDRESS
                 | SanitizerSet::THREAD
                 | SanitizerSet::REALTIME,
+            has_thread_local: false,
+            late_link_args: TargetOptions::link_args(LinkerFlavor::Darwin(Cc::Yes, Lld::No), &["-lsyscompat"]),
             ..opts
         },
     }

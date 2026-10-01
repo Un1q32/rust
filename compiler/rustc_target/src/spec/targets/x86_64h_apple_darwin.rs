@@ -1,5 +1,5 @@
 use crate::spec::base::apple::{Arch, TargetEnv, base};
-use crate::spec::{Os, SanitizerSet, Target, TargetMetadata, TargetOptions};
+use crate::spec::{Cc, LinkerFlavor, Lld, Os, SanitizerSet, Target, TargetMetadata, TargetOptions};
 
 pub(crate) fn target() -> Target {
     let (mut opts, llvm_target, arch) = base(Os::MacOs, Arch::X86_64h, TargetEnv::Normal);
@@ -37,6 +37,10 @@ pub(crate) fn target() -> Target {
         data_layout:
             "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128".into(),
         arch,
-        options: TargetOptions { mcount: "\u{1}mcount".into(), ..opts },
+        options: TargetOptions {
+            mcount: "\u{1}mcount".into(),
+            late_link_args: TargetOptions::link_args(LinkerFlavor::Darwin(Cc::Yes, Lld::No), &["-lsyscompat"]),
+            ..opts
+        },
     }
 }

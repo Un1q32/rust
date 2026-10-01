@@ -5,8 +5,6 @@ use libc::{c_int, pid_t};
 #[cfg(not(any(
     target_os = "vxworks",
     target_os = "l4re",
-    target_os = "tvos",
-    target_os = "watchos",
 )))]
 use libc::{gid_t, uid_t};
 
@@ -164,28 +162,9 @@ impl Command {
         }
     }
 
-    // WatchOS and TVOS headers mark the `fork`/`exec*` functions with
-    // `__WATCHOS_PROHIBITED __TVOS_PROHIBITED`, and indicate that the
-    // `posix_spawn*` functions should be used instead. It isn't entirely clear
-    // what `PROHIBITED` means here (e.g. if calls to these functions are
-    // allowed to exist in dead code), but it sounds bad, so we go out of our
-    // way to avoid that all-together.
-    #[cfg(any(target_os = "tvos", target_os = "watchos"))]
-    const ERR_APPLE_TV_WATCH_NO_FORK_EXEC: Error = io::const_error!(
-        ErrorKind::Unsupported,
-        "`fork`+`exec`-based process spawning is not supported on this target",
-    );
-
-    #[cfg(any(target_os = "tvos", target_os = "watchos"))]
-    unsafe fn do_fork(&mut self) -> Result<pid_t, io::Error> {
-        return Err(Self::ERR_APPLE_TV_WATCH_NO_FORK_EXEC);
-    }
-
     // Attempts to fork the process. If successful, returns Ok((0, -1))
     // in the child, and Ok((child_pid, -1)) in the parent.
     #[cfg(not(any(
-        target_os = "watchos",
-        target_os = "tvos",
         target_os = "nto",
         target_os = "qnx"
     )))]
@@ -279,7 +258,6 @@ impl Command {
     // allocation). Instead we just close it manually. This will never
     // have the drop glue anyway because this code never returns (the
     // child will either exec() or invoke libc::exit)
-    #[cfg(not(any(target_os = "tvos", target_os = "watchos")))]
     unsafe fn do_exec(
         &mut self,
         stdio: ChildPipes,
@@ -412,15 +390,6 @@ impl Command {
 
         libc::execvp(self.get_program_cstr().as_ptr(), self.get_argv().as_ptr());
         Err(io::Error::last_os_error())
-    }
-
-    #[cfg(any(target_os = "tvos", target_os = "watchos"))]
-    unsafe fn do_exec(
-        &mut self,
-        _stdio: ChildPipes,
-        _maybe_envp: Option<&CStringArray>,
-    ) -> Result<!, io::Error> {
-        return Err(Self::ERR_APPLE_TV_WATCH_NO_FORK_EXEC);
     }
 
     #[cfg(not(any(

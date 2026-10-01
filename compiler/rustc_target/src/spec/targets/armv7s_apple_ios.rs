@@ -1,5 +1,5 @@
 use crate::spec::base::apple::{Arch, TargetEnv, base};
-use crate::spec::{Os, Target, TargetMetadata, TargetOptions};
+use crate::spec::{Cc, LinkerFlavor, Lld, Os, Target, TargetMetadata, TargetOptions};
 
 pub(crate) fn target() -> Target {
     let (opts, llvm_target, arch) = base(Os::IOs, Arch::Armv7s, TargetEnv::Normal);
@@ -17,6 +17,8 @@ pub(crate) fn target() -> Target {
         options: TargetOptions {
             features: "+v7,+vfp4,+neon".into(),
             max_atomic_width: Some(64),
+            has_thread_local: false,
+            late_link_args: TargetOptions::link_args(LinkerFlavor::Darwin(Cc::Yes, Lld::No), &["-lsyscompat"]),
             ..opts
         },
     }
